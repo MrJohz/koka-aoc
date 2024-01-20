@@ -31,6 +31,24 @@ fun valid-digit(): parse int {
   digit
 }
 
+fun tigid-dilav(): parse int {
+  val digit = choose([
+    digit,
+    fn() { pstring("eroz"); 0 },
+    fn() { pstring("eno"); 1 },
+    fn() { pstring("owt"); 2 },
+    fn() { pstring("eerht"); 3 },
+    fn() { pstring("ruof"); 4 },
+    fn() { pstring("evif"); 5 },
+    fn() { pstring("xis"); 6 },
+    fn() { pstring("neves"); 7 },
+    fn() { pstring("thgie"); 8 },
+    fn() { pstring("enin"); 9 },
+  ]);
+
+  digit
+}
+
 fun any(): parse ()  {
   char-is("", fn (_) True);
   ()
@@ -47,9 +65,10 @@ fun find-first(parser: parser<e, a>): <parse|e> maybe<a> {
 }
 
 fun calibration-value2(line: string): <div> int {
-  // TODO: also find last instance of valid-digit
-  val value = line.slice.parse(fn () find-first(valid-digit));
-  value.maybe.default(Nothing).default(0)
+  val first = line.slice.parse(fn () find-first(valid-digit));
+  val last = line.list.reverse.string.slice.parse(fn () find-first(tigid-dilav));
+
+  first.maybe.default(Nothing).default(0) * 10 + last.maybe.default(Nothing).default(0)
 }
 
 
