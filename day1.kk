@@ -31,10 +31,25 @@ fun valid-digit(): parse int {
   digit
 }
 
-fun calibration-value2(line: string): int {
-  // TODO: how do I do "try this string and return the first valid parse results"?
-  val value = line.slice.parse(valid-digit);
-  value.maybe.default(0)
+fun any(): parse ()  {
+  char-is("", fn (_) True);
+  ()
+}
+
+fun find-first(parser: parser<e, a>): <parse|e> maybe<a> {
+  match optional(Nothing, (fn () Just(parser()))) {
+    Just(x) -> Just(x) 
+    Nothing() -> {
+      any();
+      find-first(parser)
+    }
+  }
+}
+
+fun calibration-value2(line: string): <div> int {
+  // TODO: also find last instance of valid-digit
+  val value = line.slice.parse(fn () find-first(valid-digit));
+  value.maybe.default(Nothing).default(0)
 }
 
 
