@@ -1,9 +1,9 @@
 # Advent of Code — Koka
 
-Advent of Code 2019, but written in Koka in order to learn the language.
+Advent of Code 2023, but written in Koka in order to learn the language.
 
 - Koka: https://github.com/koka-lang/koka
-- Advent of Code: https://adventofcode.com/2019
+- Advent of Code: https://adventofcode.com/2023
 
 ## Running the Code
 
