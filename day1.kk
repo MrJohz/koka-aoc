@@ -54,14 +54,14 @@ fun any(): parse ()  {
   ()
 }
 
-fun find-first(parser: parser<e, a>): <parse|e> maybe<a> {
-  match optional(Nothing, (fn () Just(parser()))) {
+fun find-first(parser: parser<e, a>): <div,parse|e> maybe<a> {
+  match mask<div>
+      optional(Nothing, (fn () Just(parser())))
     Just(x) -> Just(x) 
     Nothing() -> {
       any();
       find-first(parser)
     }
-  }
 }
 
 fun calibration-value2(line: string): <div> int {
