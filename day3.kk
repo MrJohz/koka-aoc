@@ -10,6 +10,18 @@ value struct position
 fun position/show(pos: position): string
   "Position(x=" ++ pos.x.show ++ ", y=" ++ pos.y.show ++ ")"
 
+fun position/left(pos: position): position
+  pos(x = pos.x - 1)
+
+fun position/up(pos: position): position
+  pos(x = pos.y - 1)
+
+fun position/right(pos: position): position
+  pos(x = pos.x + 1)
+
+fun position/down(pos: position): position
+  pos(x = pos.y + 1)
+
 value struct file
    lines: list<list<char>>
 
@@ -35,6 +47,14 @@ fun inputs(): <exn, fsys> file
   .filter(fn(line) line != "")
   .map(fn(line) line.list)
   .File
+
+
+fun surrounding-numbers(lines: file, pos: position): list<int>
+  // while function can be used here
+  var topleft := pos.up.left
+
+
+  []
 
 
 fun part1(lines: file): <div> int
