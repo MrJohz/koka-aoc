@@ -15,7 +15,7 @@ fun show(draw: draw): string {
   "Draw(red = " ++ draw.red.show ++ ", green = " ++ draw.green.show ++ ", blue = " ++ draw.blue.show ++ ")"
 }
 
-fun sep(sep: string, next: (a) -> <parse|e> a, current: a): <parse|e> a
+tail fun sep(sep: string, next: (a) -> <parse|e> a, current: a): <parse|e> a
   val parsed = optional(False, (fn() { pstring(sep); True }))
   if parsed then
     next(current)
