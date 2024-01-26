@@ -54,7 +54,7 @@ fun any(): parse ()  {
   ()
 }
 
-fun find-first(parser: parser<e, a>): <div,parse|e> maybe<a> {
+tail fun find-first(parser: parser<e, a>): <div,parse|e> maybe<a> {
   match mask<div>
       optional(Nothing, (fn () Just(parser())))
     Just(x) -> Just(x) 
