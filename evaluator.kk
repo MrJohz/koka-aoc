@@ -13,14 +13,12 @@ type expression
 
 // FUNCTION CALL EFFECT
 
-alias evalthunk = int
-
-effect func-call
-  ctl call(name: string, args: list<evalthunk>) : int
+rec effect func-call
+  ctl call(name: string, evaluate: (expr: expression) -> <func-call,pure> int, args: list<expression>) : int
 
 // EVALUATOR
 
-fun evaluate(expression: expression): <div,exn,func-call> int
+fun evaluate(expression: expression): <func-call,pure> int
   match expression
     Number(int) -> int
     BinOp(Add, left, right) -> evaluate(left) + evaluate(right)
@@ -28,8 +26,7 @@ fun evaluate(expression: expression): <div,exn,func-call> int
     BinOp(Multiply, left, right) -> evaluate(left) * evaluate(right)
     BinOp(Divide, left, right) -> evaluate(left) / evaluate(right)
     FunctionCall(name, args) -> 
-      val thunks = args.map fn(arg) evaluate(arg)
-      call(name, thunks)
+      call(name, evaluate, args)
 
 // EXAMPLE PARSE TREES
 
@@ -52,22 +49,39 @@ fun expr-nested-unknown-call(): expression
     ])
   ])
 
+fun expr-thunked-if(no: int): expression
+  FunctionCall("IF", [
+    Number(no), // if no !== 0
+    FunctionCall("ERROR_DOES_NOT_EXIST", []),
+    Number(1),
+  ])
+
 
 // effect handler/main
 
-type function-error
+value type function-error
   NotFound(name: string)
+  InvalidArguments(name: string)
 
 fun function-error/show(err: function-error): string
   match err
     NotFound(name) -> "NotFound(" ++ name ++ ")"
+    InvalidArguments(name) -> "InvalidArguments(" ++ name ++ ")"
 
 fun functions-handler(eval: () -> <func-call|e> int): e either<function-error, int>
-  with ctl call(name, args)
+  with ctl call(name, evaluator, args)
     trace("  evaluating call: " ++ name)
     match name.to-lower
-      "sum" -> resume(args.sum)
-      "product" -> resume(args.foldl(1) fn(prev, i) prev * i)
+      "sum" ->
+        args.map-while fn(arg)
+          val result = with functions-handler { evaluator(arg) }
+          match 
+        .sum
+        .resume
+      // "product" -> resume(args.foldl(1) fn(prev, arg) prev * evaluator(arg))
+      // "if" -> match args
+      //   [testee, left, right] -> resume(if evaluator(testee) == 0 then evaluator(left) else evaluator(right))
+      //   _ -> Left(InvalidArguments(name.to-upper))
       
       _ -> Left(NotFound(name.to-upper))
 
@@ -96,5 +110,15 @@ fun main()
 
   println("Eval'ing function call (unknown nested):")
   match (functions-handler(fn() evaluate(expr-nested-unknown-call())))
+    Left(error) -> error.show.println()
+    Right(result) -> result.show.println()
+
+  println("Eval'ing function call (if/argument thunks false):")
+  match (functions-handler(fn() evaluate(expr-thunked-if(0))))
+    Left(error) -> error.show.println()
+    Right(result) -> result.show.println()
+
+  println("Eval'ing function call (if/argument thunks true):")
+  match (functions-handler(fn() evaluate(expr-thunked-if(1))))
     Left(error) -> error.show.println()
     Right(result) -> result.show.println()
