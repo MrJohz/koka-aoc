@@ -1,3 +1,16 @@
+// UTILS
+
+fun list/map-until-error(list: list<a>, f: (a) -> e either<x, b>): e either<x, list<b>>
+  match list
+    Nil -> Right([])
+    Cons(head, tail) ->
+      match f(head)
+        Left(err) -> Left(err)
+        Right(value) ->
+          match list/map-until-error(tail, f)
+            Left(err) -> Left(err)
+            Right(values) -> Right(Cons(value, values))
+
 // TYPES
 
 type binop
@@ -14,7 +27,7 @@ type expression
 // FUNCTION CALL EFFECT
 
 rec effect func-call
-  ctl call(name: string, evaluate: (expr: expression) -> <func-call,pure> int, args: list<expression>) : int
+  ctl call(name: string, evaluator: (expr: expression) -> <func-call,pure> int, args: list<expression>) : int
 
 // EVALUATOR
 
@@ -56,6 +69,9 @@ fun expr-thunked-if(no: int): expression
     Number(1),
   ])
 
+fun expr-if-wrong-arg-no(): expression
+  FunctionCall("IF", [])
+
 
 // effect handler/main
 
@@ -68,20 +84,31 @@ fun function-error/show(err: function-error): string
     NotFound(name) -> "NotFound(" ++ name ++ ")"
     InvalidArguments(name) -> "InvalidArguments(" ++ name ++ ")"
 
-fun functions-handler(eval: () -> <func-call|e> int): e either<function-error, int>
+fun functions-handler(eval: () -> <func-call,pure|e> int): <pure|e> either<function-error, int>
   with ctl call(name, evaluator, args)
     trace("  evaluating call: " ++ name)
     match name.to-lower
       "sum" ->
-        args.map-while fn(arg)
-          val result = with functions-handler { evaluator(arg) }
-          match 
-        .sum
-        .resume
-      // "product" -> resume(args.foldl(1) fn(prev, arg) prev * evaluator(arg))
-      // "if" -> match args
-      //   [testee, left, right] -> resume(if evaluator(testee) == 0 then evaluator(left) else evaluator(right))
-      //   _ -> Left(InvalidArguments(name.to-upper))
+        match (args.map-until-error fn(arg) functions-handler { evaluator(arg) })
+          Left(err) -> Left(err)
+          Right(values) -> values.sum.resume
+      "product" ->
+        match (args.map-until-error fn(arg) functions-handler { evaluator(arg) })
+          Left(err) -> Left(err)
+          Right(values) -> values.foldl(1, fn(prev, arg) prev * arg).resume
+      "if" -> match args
+        [testee, left, right] -> 
+          match (functions-handler { evaluator(testee) })
+            Left(err) -> Left(err)
+            Right(value) -> 
+              if value == 0
+                then match (functions-handler { evaluator(right) })
+                  Left(err) -> Left(err)
+                  Right(value) -> value.resume
+                else match (functions-handler { evaluator(left) })
+                  Left(err) -> Left(err)
+                  Right(value) -> value.resume
+        _ -> Left(InvalidArguments(name.to-upper))
       
       _ -> Left(NotFound(name.to-upper))
 
@@ -120,5 +147,10 @@ fun main()
 
   println("Eval'ing function call (if/argument thunks true):")
   match (functions-handler(fn() evaluate(expr-thunked-if(1))))
+    Left(error) -> error.show.println()
+    Right(result) -> result.show.println()
+
+  println("Eval'ing function call (if/argument thunks true):")
+  match (functions-handler(fn() evaluate(expr-if-wrong-arg-no())))
     Left(error) -> error.show.println()
     Right(result) -> result.show.println()
