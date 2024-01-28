@@ -11,6 +11,11 @@ fun list/map-until-error(list: list<a>, f: (a) -> e either<x, b>): e either<x, l
             Left(err) -> Left(err)
             Right(values) -> Right(Cons(value, values))
 
+fun either/flatmap(e: either<x, a>, f: (a) -> e either<x, b>): e either<x, b>
+  match e
+    Left(err) -> Left(err)
+    Right(value) -> f(value)
+
 // TYPES
 
 type binop
@@ -89,25 +94,17 @@ fun functions-handler(eval: () -> <func-call,pure|e> int): <pure|e> either<funct
     trace("  evaluating call: " ++ name)
     match name.to-lower
       "sum" ->
-        match (args.map-until-error fn(arg) functions-handler { evaluator(arg) })
-          Left(err) -> Left(err)
-          Right(values) -> values.sum.resume
+        with values <- (args.map-until-error fn(arg) functions-handler { evaluator(arg) }).flatmap
+        values.sum.resume
       "product" ->
-        match (args.map-until-error fn(arg) functions-handler { evaluator(arg) })
-          Left(err) -> Left(err)
-          Right(values) -> values.foldl(1, fn(prev, arg) prev * arg).resume
+        with values <- (args.map-until-error fn(arg) functions-handler { evaluator(arg) }).flatmap
+        values.foldl(1, fn(prev, arg) prev * arg).resume
       "if" -> match args
         [testee, left, right] -> 
-          match (functions-handler { evaluator(testee) })
-            Left(err) -> Left(err)
-            Right(value) -> 
-              if value == 0
-                then match (functions-handler { evaluator(right) })
-                  Left(err) -> Left(err)
-                  Right(value) -> value.resume
-                else match (functions-handler { evaluator(left) })
-                  Left(err) -> Left(err)
-                  Right(value) -> value.resume
+          with value <- (functions-handler { evaluator(testee) }).flatmap
+          val parameter = if value == 0 then right else left
+          with result <- (functions-handler { evaluator(parameter) }).flatmap
+          result.resume
         _ -> Left(InvalidArguments(name.to-upper))
       
       _ -> Left(NotFound(name.to-upper))
