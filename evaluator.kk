@@ -1,21 +1,3 @@
-// UTILS
-
-fun list/map-until-error(list: list<a>, f: (a) -> e either<x, b>): e either<x, list<b>>
-  match list
-    Nil -> Right([])
-    Cons(head, tail) ->
-      match f(head)
-        Left(err) -> Left(err)
-        Right(value) ->
-          match list/map-until-error(tail, f)
-            Left(err) -> Left(err)
-            Right(values) -> Right(Cons(value, values))
-
-fun either/flatmap(e: either<x, a>, f: (a) -> e either<x, b>): e either<x, b>
-  match e
-    Left(err) -> Left(err)
-    Right(value) -> f(value)
-
 // TYPES
 
 type binop
@@ -32,11 +14,11 @@ type expression
 // FUNCTION CALL EFFECT
 
 rec effect func-call
-  ctl call(name: string, evaluator: (expr: expression) -> <func-call,pure> int, args: list<expression>) : int
+  ctl call(name: string, evaluator: (expr: expression) -> <div,func-call> int, args: list<expression>) : int
 
 // EVALUATOR
 
-fun evaluate(expression: expression): <func-call,pure> int
+fun evaluate(expression: expression): <div,func-call> int
   match expression
     Number(int) -> int
     BinOp(Add, left, right) -> evaluate(left) + evaluate(right)
@@ -80,74 +62,53 @@ fun expr-if-wrong-arg-no(): expression
 
 // effect handler/main
 
-value type function-error
-  NotFound(name: string)
-  InvalidArguments(name: string)
+effect ctl err-not-found(name: string): a
+effect ctl err-invalid-arguments(name: string): a
 
-fun function-error/show(err: function-error): string
-  match err
-    NotFound(name) -> "NotFound(" ++ name ++ ")"
-    InvalidArguments(name) -> "InvalidArguments(" ++ name ++ ")"
-
-fun functions-handler(eval: () -> <func-call,pure|e> int): <pure|e> either<function-error, int>
+fun functions-handler(eval: () -> <func-call,div,err-invalid-arguments,err-not-found|e> int): <div,err-not-found,err-invalid-arguments|e> int
   with ctl call(name, evaluator, args)
     trace("  evaluating call: " ++ name)
     match name.to-lower
-      "sum" ->
-        with values <- (args.map-until-error fn(arg) functions-handler { evaluator(arg) }).flatmap
-        values.sum.resume
+      "sum" -> args.map(fn(arg) functions-handler { evaluator(arg) }).sum.resume
       "product" ->
-        with values <- (args.map-until-error fn(arg) functions-handler { evaluator(arg) }).flatmap
-        values.foldl(1, fn(prev, arg) prev * arg).resume
+        args.map(fn(arg) functions-handler { evaluator(arg) }).foldl(1, fn(prev, arg) prev * arg).resume
       "if" -> match args
         [testee, left, right] -> 
-          with value <- (functions-handler { evaluator(testee) }).flatmap
-          val parameter = if value == 0 then right else left
-          with result <- (functions-handler { evaluator(parameter) }).flatmap
-          result.resume
-        _ -> Left(InvalidArguments(name.to-upper))
+          val test = functions-handler { evaluator(testee) }
+          val parameter = if test == 0 then right else left
+          (functions-handler { evaluator(parameter) }).resume
+        _ -> err-invalid-arguments(name.to-upper)
       
-      _ -> Left(NotFound(name.to-upper))
+      _ -> err-not-found(name.to-upper)
 
-  Right(eval())
+  eval()
+
+fun error-handler(eval: () -> <err-not-found,err-invalid-arguments|e> int): e string
+  with final ctl err-not-found(name) "function not found: " ++ name
+  with final ctl err-invalid-arguments(name) "invalid arguments for function: " ++ name
+  eval().show
 
 fun main()
   println("Addition of values:")
-  match (functions-handler(fn() evaluate(expr-addition())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-addition()) } }).println()
 
   println("Eval'ing function call (sum):")
-  match (functions-handler(fn() evaluate(expr-function-sum())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-function-sum()) } }).println()
 
   println("Eval'ing function call (product):")
-  match (functions-handler(fn() evaluate(expr-function-product())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-function-product()) } }).println()
 
   println("Eval'ing function call (unknown):")
-  match (functions-handler(fn() evaluate(expr-unknown-function-call())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-unknown-function-call()) } }).println()
 
   println("Eval'ing function call (unknown nested):")
-  match (functions-handler(fn() evaluate(expr-nested-unknown-call())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-nested-unknown-call()) } }).println()
 
   println("Eval'ing function call (if/argument thunks false):")
-  match (functions-handler(fn() evaluate(expr-thunked-if(0))))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-thunked-if(0)) } }).println()
 
   println("Eval'ing function call (if/argument thunks true):")
-  match (functions-handler(fn() evaluate(expr-thunked-if(1))))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  (error-handler { functions-handler { evaluate(expr-thunked-if(1)) } }).println()
 
-  println("Eval'ing function call (if/argument thunks true):")
-  match (functions-handler(fn() evaluate(expr-if-wrong-arg-no())))
-    Left(error) -> error.show.println()
-    Right(result) -> result.show.println()
+  println("Eval'ing function call (if/argument wrong arg no):")
+  (error-handler { functions-handler { evaluate(expr-if-wrong-arg-no()) } }).println()
